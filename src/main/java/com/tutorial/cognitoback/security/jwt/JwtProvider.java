@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -21,6 +22,7 @@ public class JwtProvider {
     private static final String USERNAME_FIELD = "username";
     private static final String BEARER = "Bearer ";
     private static final String AUTHORIZATION = "Authorization";
+    private static final String rolesFiled = "cognito:groups";
 
     @Value("${com.tutorial.jwt.aws.identityPoolUrl}")
     private String identityPoolUrl;
@@ -36,7 +38,10 @@ public class JwtProvider {
             String username = getUsername(claims);
             if (username != null) {
                 // TODO set roles
-                List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+                String roles = getRoles(claims);
+                List<GrantedAuthority> authorities =
+                        rolesToList(roles).stream().map(rol -> new SimpleGrantedAuthority(rol)).collect(Collectors.toList());
+                log.info(authorities.toString());
                 User user = new User(username, "", authorities);
                 return new JwtAuthenticator(authorities, user, claims);
             }
@@ -55,5 +60,17 @@ public class JwtProvider {
 
     private String getToken(String token) {
         return token.startsWith(BEARER) ? token.substring(BEARER.length()) : token;
+    }
+
+    private String getRoles(JWTClaimsSet claims) {
+        return claims.getClaim(rolesFiled).toString();
+    }
+
+    private List<String> rolesToList(String roles) {
+        String noSquare = roles.replace("[", "");
+        noSquare = noSquare.replace("]", "");
+        String noQuotes = noSquare.replace("\"", "");
+        String noSpaces = noQuotes.replace(" ", "");
+        return List.of(noSpaces.split(","));
     }
 }
